@@ -1,0 +1,242 @@
+{{- if and (eq .Values.global.istio.enabled true) -}}
+{{- $releaseName := .Release.Name -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: appdu-demo39-istio-ingressgateway
+    chart: gateways
+    heritage: Tiller
+    istio: appdu-demo39-istio-ingressgateway
+    release: istio
+  name: appdu-demo39-istio-ingressgateway
+  namespace: appdu-demo39
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: appdu-demo39-istio-ingressgateway
+      chart: gateways
+      heritage: Tiller
+      istio: appdu-demo39-istio-ingressgateway
+      release: istio
+  template:
+    metadata:
+      labels:
+        app: appdu-demo39-istio-ingressgateway
+        chart: gateways
+        heritage: Tiller
+        istio: appdu-demo39-istio-ingressgateway
+        release: istio
+    spec:
+      containers:
+        - args:
+            - proxy
+            - router
+            - '--domain'
+            - $(POD_NAMESPACE).svc.cluster.local
+            - '--proxyLogLevel=error'
+            - '--log_output_level=default:info'
+            - '--drainDuration'
+            - 45s
+            - '--parentShutdownDuration'
+            - 1m0s
+            - '--connectTimeout'
+            - 10s
+            - '--serviceCluster'
+            - millet-istio-ingressgateway
+            - '--zipkinAddress'
+            - 'jaeger-collector.istio-system:9411'
+            - '--proxyAdminPort'
+            - '15000'
+            - '--statusPort'
+            - '15020'
+            - '--controlPlaneAuthPolicy'
+            - NONE
+            - '--discoveryAddress'
+            - 'istio-pilot.istio-system:15010'
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: INSTANCE_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+            - name: ISTIO_META_POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: ISTIO_META_CONFIG_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: ISTIO_META_ROUTER_MODE
+              value: sni-dnat
+          image: 'ktis-bastion01.container.ipc.kt.com:5000/istio/proxyv2:1.1.17'
+          imagePullPolicy: IfNotPresent
+          name: istio-proxy
+          ports:
+            - containerPort: 15020
+              protocol: TCP
+            - containerPort: 80
+              protocol: TCP
+            - containerPort: 443
+              protocol: TCP
+            - containerPort: 31400
+              protocol: TCP
+            - containerPort: 15029
+              protocol: TCP
+            - containerPort: 15030
+              protocol: TCP
+            - containerPort: 15031
+              protocol: TCP
+            - containerPort: 15032
+              protocol: TCP
+            - containerPort: 15443
+              protocol: TCP
+            - containerPort: 15090
+              name: http-envoy-prom
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 30
+            httpGet:
+              path: /healthz/ready
+              port: 15020
+              scheme: HTTP
+            initialDelaySeconds: 1
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 500Mi
+            requests:
+              cpu: 500m
+              memory: 200Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/certs
+              name: istio-certs
+              readOnly: true
+            - mountPath: /etc/istio/ingressgateway-certs
+              name: ingressgateway-certs
+              readOnly: true
+            - mountPath: /etc/istio/ingressgateway-ca-certs
+              name: ingressgateway-ca-certs
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: istio-certs
+          secret:
+            defaultMode: 420
+            optional: true
+            secretName: istio.istio
+        - name: ingressgateway-certs
+          secret:
+            defaultMode: 420
+            optional: true
+            secretName: istio-ingressgateway-certs
+        - name: ingressgateway-ca-certs
+          secret:
+            defaultMode: 420
+            optional: true
+            secretName: istio-ingressgateway-ca-certs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: appdu-demo39-istio-ingressgateway
+    chart: gateways
+    heritage: Tiller
+    istio: appdu-demo39-istio-ingressgateway
+    release: istio
+  name: appdu-demo39-istio-ingressgateway
+  namespace: appdu-demo39
+spec:
+  ports:
+    - name: status-port
+      port: 15020
+      protocol: TCP
+      targetPort: 15020
+    - name: http2
+      port: 80
+      protocol: TCP
+      targetPort: 80
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 443
+    - name: tcp
+      port: 31400
+      protocol: TCP
+      targetPort: 31400
+    - name: https-kiali
+      port: 15029
+      protocol: TCP
+      targetPort: 15029
+    - name: https-prometheus
+      port: 15030
+      protocol: TCP
+      targetPort: 15030
+    - name: https-grafana
+      port: 15031
+      protocol: TCP
+      targetPort: 15031
+    - name: https-tracing
+      port: 15032
+      protocol: TCP
+      targetPort: 15032
+    - name: tls
+      port: 15443
+      protocol: TCP
+      targetPort: 15443
+  selector:
+    app: appdu-demo39-istio-ingressgateway
+    istio: appdu-demo39-istio-ingressgateway
+    release: istio
+  type: ClusterIP
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  labels:
+    app: appdu-demo39-istio-ingressgateway
+    chart: gateways
+    heritage: Tiller
+    istio: appdu-demo39-istio-ingressgateway
+    release: istio
+  name: appdu-demo39-istio-ingressgateway
+  namespace: appdu-demo39
+spec:
+  maxReplicas: 5
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: appdu-demo39-istio-ingressgateway
+  targetCPUUtilizationPercentage: 80
+
+{{- end }}

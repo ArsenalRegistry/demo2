@@ -1,0 +1,10 @@
+apiVersion: v2
+appVersion: "1.0"
+description: A Helm chart for Kubernetes
+name: appdu-demo3-dev-deploy
+version: 0.1.0
+dependencies:
+- name: backend-java
+  version: 1.0.0
+- name: frontend-vue
+  version: 1.0.0
