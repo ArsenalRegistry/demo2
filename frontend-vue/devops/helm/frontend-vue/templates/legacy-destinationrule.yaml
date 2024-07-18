@@ -1,0 +1,15 @@
+{{- if .Values.istio.enabled -}}
+{{- $releaseName := .Release.Name -}}
+{{- range .Values.istio.destination.legacy.hosts }}
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: {{ $releaseName }}-legacy-{{ . }}
+spec:
+  host: {{ . }}
+  trafficPolicy:
+    tls:
+      mode: DISABLE
+---
+{{- end }}
+{{- end }}

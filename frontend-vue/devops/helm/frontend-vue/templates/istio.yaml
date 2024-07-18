@@ -1,0 +1,75 @@
+{{- if and (eq .Values.global.istio.enabled true) (eq .Values.istio.enabled true) -}}
+{{- $releaseName := .Release.Name -}}
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: {{ $.Values.app }}-gateway
+spec:
+  selector:
+    istio: {{ $.Values.global.namespace }}-istio-ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    {{- range .Values.ingress.hosts }}
+    - {{ .host }}
+    {{- end }}
+---
+{{- end }}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ $.Values.app }}
+spec:
+  {{- if .Values.ingress.enabled }}
+  hosts:
+  {{- range .Values.ingress.hosts }}
+  - {{ .host }}
+  {{- end }}
+  gateways:
+  - {{ $.Values.app }}-gateway
+  {{- else}}
+  hosts:
+  - {{ $.Values.app }}
+  {{- end }}
+  http:
+  - match:
+    - port: 80
+    route:
+    - destination:
+        host: {{ $.Values.app }}
+        subset: orgin
+      weight: 100
+{{if $.Values.canary.enabled}}
+    - destination:
+        host: {{ $.Values.app }}
+        subset: canary
+      weight: 0
+{{end}}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: {{ $.Values.app }}
+spec:
+  host: {{ $.Values.app }}
+  subsets:
+  - name: orgin
+    labels:
+      app: {{ $.Values.app }}
+      chart: {{ template "merge.chart" $ }}
+      release: {{ $releaseName }}
+      type: "normal"
+{{if $.Values.canary.enabled}}
+  - name: canary
+    labels:
+      app: {{ $.Values.app }}
+      chart: {{ template "merge.chart" $ }}
+      release: {{ $releaseName }}
+      type: "canary"
+      version: {{ $.Values.canary.version }}
+{{end}}
+{{- end }}

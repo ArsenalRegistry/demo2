@@ -1,0 +1,261 @@
+# Default values for merge
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+##=(Summary)================================================================================###
+##
+## Helm Chart - [Merge Package]
+##   - version: 1.0.0
+##   - createDate: 2019.05.15
+##   - modifiedDate: 2019.05.15
+##   - description:
+##     - (2019.05.15 1.0.0) : 최초 작성
+##
+##=========================================================================================###
+
+##=(Description)===========================================================================###
+##
+## helm을 사용하지 않는 기존 패턴에서 helm 으로 전환하기 위한 형태의 package.
+## 기존에 사용하던 yaml manifest를 그대로 적용가능함.
+##
+##=========================================================================================###
+global:
+  istio:
+    enabled: false
+  namespace: appdu-demo3
+
+##=(Application 기본 작성 영역)============================================================###
+## Application 기본 정보 작성 영역 
+## 
+## version: Application Version 명
+## app: Application 이름 명시
+##
+##
+##=========================================================================================###
+version: latest
+app: frontend-vue
+##=========================================================================================###
+
+
+
+
+
+
+##=(Service Values 작성영역)===============================================================###
+## services values 작성영역
+##
+## name: 작성명칭
+## tag: 배포 이미지 버전과 동일
+## port: 기본 포트는 80. Pod에서 8080으로 지정되어있는 경우, Service에서 80으로 구성함.
+## ----------                 -----------------------------------                ---------- ##
+## ----------                 -----------------------------------                ---------- ##
+services:
+  - type: ClusterIP
+    port: 80 
+    targetPort : 80
+##=========================================================================================###
+
+
+
+
+##=(Deployments Values 작성영역)===========================================================###
+## deployments values 작성영역
+##
+## 기존의 작성 형태를 그대로 사용 가능 함.
+## image 의tag부분은 ${version} 으로 마킹하여 helm 배포시 지정된 version 으로 replace한다.
+## ex) image: docker-registry.default.svc.cluster.local:5000/millet/userlist:${version}
+## ----------                 -----------------------------------                ---------- ##
+## ----------                 -----------------------------------                ---------- ##
+replicas: 1
+deployments:
+  - spec:
+      containers:
+      - image: image-registry.openshift-image-registry.svc:5000/appdu-demo3/frontend-vue:${version}
+        imagePullPolicy: Always
+        name: frontend-vue
+        ports:
+        - containerPort: 80
+          name: http
+
+        envFrom:
+        - configMapRef:
+            name: frontend-vue-env-configmap
+
+        - secretRef:
+            name: frontend-vue-env-secret
+
+        
+        env:
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+
+
+        
+        resources: 
+          requests:
+            cpu: 100m
+            memory: 384Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+        
+        
+        
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 5 
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 5
+
+##=========================================================================================###
+
+
+
+##=(Cronjob Values 작성영역)===========================================================###
+## cronjob values 작성영역
+##
+## schedule 시간은 UTC 시간 기준으로 작성시간의 +9 시간 뒤에 동작하게 된다.
+##   예) schedule: "0 18 * * *"  -- 18+9=27 - 1일(24) = 03시 동작
+##   예) schedule: "0 15 * * *"  -- 15+9=24 - 1일(24) = 00시 동작
+##
+## 기존의 작성 형태를 그대로 사용 가능 함.
+## image 의tag부분은 ${version} 으로 마킹하여 helm 배포시 지정된 version 으로 replace한다.
+## ex) image: docker-registry.default.svc.cluster.local:5000/millet/userlist:${version}
+## ----------                 -----------------------------------                ---------- ##
+## ----------                 -----------------------------------                ---------- ##
+
+#successfulJobsHistoryLimit: 3
+#failedJobsHistoryLimit: 3
+#schedule: "30 18 * * *"
+#cronjobs:
+#  - spec:
+#      restartPolicy: Never
+#      containers:
+#      - image: docker-registry.default.svc:5000/appdu-demo39/frontend-vue:${version}
+#        imagePullPolicy: Always
+#        name: frontend-vue
+#        ports:
+#        - containerPort: 8080
+#          name: http
+#
+#        resources: 
+#          requests:
+#            cpu: 500m
+#            memory: 512Mi
+#          limits:
+#            cpu: 500m
+#            memory: 512Mi
+
+    
+
+
+##=(ConfigMap 작성영역)===========================================================###
+## configmap 작성영역
+##
+## configMap: 하위에 명시한 내용이 하나의 ConfigMap으로 생성되어 Deployment에 반영됨.
+## Java 의 경우 Spring Profile을 명시적으로 정의 할 수 있음. 
+## 그 외 필요한 Properties를 명시하면, Configmap으로 적용되어 사용 가능 함.
+## ----------                 -----------------------------------                ---------- ##
+## ----------                 -----------------------------------                ---------- ##
+configMap:
+  ex: 'ex'
+
+##=========================================================================================###
+
+
+
+
+##=(ingress values 작성영역)===============================================================###
+## ingress values 작성영역
+## 구성단위(web)의 외부 expose에 대한 설정.
+## web 서버만 외부 접근되는 형태로 구성됨.
+##
+## enabled: 설정적용 유무 
+## routerEnabled: router사용여부, Openshift는 true, K8S기반은 false로 설정
+## path: content-root path
+## serviceName: 외부접근으로 내부로 연계할 service 명칭. service 구성에서 명시한 web service 기술.
+##              default: web 예) web, web-application
+## hosts: 외부 제공 도메인 명칭.(발급된 DNS 인증서가 존재하면, 해당 명칭)
+##        예) abc.container.ipc.kt.com
+## ----------                 -----------------------------------                ---------- ##
+## ----------                 -----------------------------------                ---------- ##
+ingress:
+  enabled: false
+  routerEnabled: true
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  serviceName: frontend-vue
+  hosts:
+    - host: 
+      paths: 
+        - /
+  tls: []
+  #  - caCertificate: |-
+  #      -----BEGIN CERTIFICATE-----
+  #      MIIG1zCCBb+gAwIBAgIRAIZPYQZCKrU41i4AtcVraEEwDQYJKoZIhvcNAQELBQAw
+  #
+  # kubernetes(accordian)에서는 secret으로 생성하고 secret 명칭으로 입력한다.
+##=========================================================================================###
+
+
+
+##=(istio values 작성영역)=================================================================###
+## istio values 작성영역
+##
+## enabled: 설정적용 유무
+## destination: 적용대상 service 명칭
+## version: v1, v2 각각에 대한 이미지 버전
+## weight: canary 를 고려한 weight
+## legacy:
+##   hosts: istio -> non-istio 호출 시에 필요한 non-istio service의 destination rule 생성.
+##          예) DB(내 외부 포함), Redis 등
+##          참고) istio 1.1.1 이전까지는 redis가 동작되지 않음. 따라서 redis 관련 pod는 일반으로 설정해야 함.
+## ----------                 -----------------------------------                ---------- ##
+## ----------                 -----------------------------------                ---------- ##
+istio:
+  enabled: false
+  destination:
+    host: frontend-vue
+    legacy:
+    
+    
+      hosts: []
+    
+##=========================================================================================###
+
+
+##=(DB user, password secret)==============================================================###
+secret:
+  ex: 'ex'
+
+
+##=========================================================================================###
+
+
+canary:
+  enabled: false
+  version: 1.1.0

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings>
+  <mirrors>
+   <mirror>
+      <id>public</id>
+      <mirrorOf>external:*</mirrorOf>
+      <url>http://nexus-repository.cz-dev.container.kt.co.kr/nexus3/repository/public</url>
+    </mirror>
+  </mirrors>
+  <localRepository>/home/jenkins/.m2/repository</localRepository>
+</settings>

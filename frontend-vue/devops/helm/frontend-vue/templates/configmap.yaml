@@ -1,0 +1,17 @@
+# Setup env secrets 
+{{- if hasKey .Values "configMap" }}
+{{- $root := .Values.configMap }}
+{{- $releaseName := .Release.Name }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Values.app }}-env-configmap
+  labels:
+    app: {{ $.Values.app }}
+    chart: {{ template "merge.chart" $ }}
+    release: {{ $releaseName }}
+data:
+{{- range $k,$v := $root }}
+  {{$k }}: {{ default "" $v | quote }}
+{{- end}}
+{{- end}}

@@ -1,0 +1,42 @@
+{{- $releaseName := .Release.Name -}}
+{{- $istioEnabled := and (eq .Values.global.istio.enabled true) (eq .Values.istio.enabled true) -}}
+{{- range .Values.cronjobs }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $.Values.app }}
+  labels:
+    app: {{ $.Values.app }}
+    chart: {{ template "merge.chart" $ }}
+    release: {{ $releaseName }}
+spec:
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          {{- if $istioEnabled }}
+          annotations:
+            sidecar.istio.io/inject: "true"
+          {{- end }}
+          labels:
+            app: {{ $.Values.app }}
+            chart: {{ template "merge.chart" $ }}
+            release: {{ $releaseName }}
+        spec:
+{{- $versionStart := $.Values.version|trunc 7 }}
+{{- if eq $versionStart "sha256:" }}
+{{ $changedVersion := printf "@%s" $.Values.version -}}
+{{ toYaml .spec | indent 12| replace ":${version}" $changedVersion  }}
+{{- else }}
+{{ toYaml .spec | indent 12| replace "${version}" $.Values.version  }}
+{{- end }}
+  schedule: {{ $.Values.schedule | quote }}
+  successfulJobsHistoryLimit: {{ $.Values.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $.Values.failedJobsHistoryLimit }}
+  suspend: false
+  concurrencyPolicy: Forbid
+
+{{- end }}

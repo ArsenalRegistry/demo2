@@ -1,0 +1,44 @@
+{{- if and .Values.ingress.enabled .Values.ingress.routerEnabled -}}
+{{- $istioEnabled := and (eq .Values.global.istio.enabled true) (eq .Values.istio.enabled true) -}}
+{{- $fullName := .Release.Name -}}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ .Values.app }}-{{ $fullName }}
+  labels:
+{{ include "merge.labels" . | indent 4 }}
+    #router: dmz-router
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+{{- if index .Values.ingress.hosts 0 }}
+  host: {{ (index .Values.ingress.hosts 0).host  }}
+  path: {{ (index  (index .Values.ingress.hosts 0).paths 0) }}
+  port:
+  {{- if $istioEnabled }}
+    targetPort: http2
+  {{- else }}
+    targetPort: http
+  {{- end}}
+  to:
+    {{- if $istioEnabled }}
+    kind: Service
+    name: {{ .Values.global.namespace }}-istio-ingressgateway
+    weight: 100
+    {{- else }}
+    kind: Service
+    name: {{ .Values.ingress.serviceName }}
+    weight: 100
+    {{- end }}
+  wildcardPolicy: None
+{{- if .Values.ingress.tls }}
+  tls:
+  {{- if index .Values.ingress.tls 0 }} 
+    {{- toYaml (index .Values.ingress.tls 0) | nindent 4 }}
+  {{- end }}
+{{- end }}
+
+{{- end }}
+{{- end }}

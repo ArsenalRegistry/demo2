@@ -1,0 +1,34 @@
+{{- $releaseName := .Release.Name -}}
+{{- range .Values.services }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.app }}
+  labels:
+    app: {{ $.Values.app }}
+    chart: {{ template "merge.chart" $ }}
+    release: {{ $releaseName }}
+spec:
+  {{- if eq .type "NodePort" }}
+  type: NodePort
+  ports:
+    - port: {{ .port }}
+      targetPort: {{ .targetPort }}
+      nodePort: {{ .nodePort }}
+      protocol: TCP
+      name: http
+  {{- else }}
+  type: {{ .type }}
+  ports:
+    - port: {{ .port }}
+      targetPort: {{ .targetPort }}
+      protocol: TCP
+      name: http
+  {{- end }}
+  selector:
+    app: {{ $.Values.app }}
+    chart: {{ template "merge.chart" $ }}
+    release: {{ $releaseName }}
+---
+
+{{- end }}
